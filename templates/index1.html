@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 推理服务平台</title>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --light: #f8f9fa;
+            --dark: #212529;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fb;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header { text-align: center; padding: 20px 0 10px; }
+        h1 { color: var(--primary); margin-bottom: 6px; font-size: 1.8rem; }
+        header p { font-size: .95rem; color: #555; }
+
+        .main-content {
+            display: flex;
+            gap: 24px;
+        }
+        .input-panel, .output-panel {
+            flex: 1;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,.08);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-title {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: var(--primary);
+            border-bottom: 2px solid #eee;
+            padding-bottom: 8px;
+        }
+
+        /* 仅第二步可折叠 */
+        .step-fold {
+            margin-bottom: 10px;
+        }
+        .step-header-fold {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: #eef7ff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            user-select: none;
+        }
+        .step-header-fold:hover { background: #dce9ff; }
+        .step-arrow-fold { transition: transform .3s ease; }
+        .step-fold.open .step-arrow-fold { transform: rotate(180deg); }
+        .step-content-fold {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height .35s ease;
+            padding: 0 12px;
+        }
+        .step-fold.open .step-content-fold {
+            max-height: 600px;
+            padding: 12px 12px 20px;
+        }
+
+        /* 普通块 */
+        .block {
+            margin-bottom: 20px;
+        }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-weight: 500; font-size: .95rem; }
+        select, input, textarea, button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: .95rem;
+        }
+        textarea { min-height: 80px; resize: vertical; }
+        .btn-group { display: flex; gap: 12px; margin-top: 15px; }
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all .25s ease;
+        }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-secondary { background: #6c757d; color: #fff; }
+        .btn:hover { opacity: .9; transform: translateY(-2px); }
+
+        /* 预览区 */
+        .preview-box {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fafafa;
+            margin-top: 10px;
+            position: relative;
+        }
+        .preview-box img, .preview-box video {
+            max-width: 100%;
+            max-height: 200px;
+            display: none;
+        }
+
+        /* 状态条 */
+        .status {
+            margin-top: 12px;
+            padding: 8px 10px;
+            border-radius: 5px;
+            font-size: .9rem;
+            display: none;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+
+        /* 结果区 */
+        #result-text { color: #666; font-size: .95rem; }
+        .result-actions { display: flex; gap: 12px; margin-top: 15px; }
+
+        /* 使用说明 */
+        .instructions {
+            background: #eef7ff;
+            border-left: 4px solid var(--primary);
+            padding: 14px 16px;
+            border-radius: 0 8px 8px 0;
+            margin-top: 24px;
+            font-size: .9rem;
+        }
+        .instructions ol { margin-left: 18px; }
+        .instructions p { margin-top: 8px; }
+
+        @media (max-width: 992px) {
+            .main-content { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI 推理服务平台</h1>
+            <p>上传图片或视频，选择算法进行智能分析</p>
+        </header>
+
+        <div class="main-content">
+            <!-- 左侧：仅第二步折叠 -->
+            <div class="input-panel">
+                <h2 class="panel-title">输入设置</h2>
+
+                <!-- 第一步：上传（永不折叠） -->
+                <div class="block">
+                    <div class="form-group">
+                        <label for="file">选择图片/视频</label>
+                        <input type="file" id="file" accept="image/*,video/*">
+                        <div id="file-info" style="margin-top:6px;font-size:.85rem;color:#666;"></div>
+                    </div>
+                    <div class="preview-box" id="input-preview">
+                        <div id="preview-text">预览区域</div>
+                        <img id="preview-img" alt="">
+                        <video id="preview-video" controls></video>
+                    </div>
+                </div>
+
+                <!-- 第二步：填写参数（可折叠） -->
+                <div class="step-fold open">
+                    <div class="step-header-fold" onclick="this.parentElement.classList.toggle('open')">
+                        <span><span class="step-number">2</span>填写参数（点击折叠/展开）</span>
+                        <span class="step-arrow-fold">▼</span>
+                    </div>
+                    <div class="step-content-fold">
+                        <div class="form-group">
+                            <label for="algorithm">算法模型</label>
+                            <select id="algorithm">
+                                {% for algo in algorithms %}
+                                <option value="{{ algo }}">{{ algo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="prompt">提示词（可选）</label>
+                            <textarea id="prompt" placeholder="输入描述性文字或指令..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="additional-info">附加信息（可选）</label>
+                            <textarea id="additional-info" placeholder="如坐标等..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第三步：执行（永不折叠） -->
+                <div class="block">
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" id="clear-btn">清除全部</button>
+                        <button class="btn btn-primary" id="infer-btn">开始推理</button>
+                    </div>
+                    <div id="status" class="status"></div>
+                </div>
+            </div>
+
+            <!-- 右侧：结果 -->
+            <div class="output-panel">
+                <h2 class="panel-title">推理结果</h2>
+                <div class="preview-box" id="output-preview">
+                    <div id="result-text">等待推理结果…</div>
+                    <img id="result-img" alt="">
+                    <video id="result-video" controls></video>
+                </div>
+                <div class="result-actions">
+                    <button class="btn btn-primary" id="save-result-btn" style="flex:1;">保存结果</button>
+                    <button class="btn btn-secondary" id="download-btn" style="flex:1;">下载</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>使用说明</h3>
+            <ol>
+                <li>上传图片/视频（必填）</li>
+                <li>展开“填写参数”并完善信息（可选）</li>
+                <li>点击“开始推理”</li>
+                <li>右侧查看结果并保存/下载</li>
+            </ol>
+            <p><strong>注意：</strong>当前为示例界面，实际推理功能需在 <code>/infer</code> 路由实现</p>
+        </div>
+    </div>
+
+    <script>
+        /* ---------- DOM  ---------- */
+        const fileInput   = document.getElementById('file');
+        const previewImg  = document.getElementById('preview-img');
+        const previewVideo= document.getElementById('preview-video');
+        const previewText = document.getElementById('preview-text');
+
+        const resultImg   = document.getElementById('result-img');
+        const resultVideo = document.getElementById('result-video');
+        const resultText  = document.getElementById('result-text');
+
+        const inferBtn     = document.getElementById('infer-btn');
+        const clearBtn     = document.getElementById('clear-btn');
+        const saveBtn      = document.getElementById('save-result-btn');
+        const downBtn      = document.getElementById('download-btn');
+        const statusDiv    = document.getElementById('status');
+
+        const algoSel   = document.getElementById('algorithm');
+        const promptTa  = document.getElementById('prompt');
+        const addInfoTa = document.getElementById('additional-info');
+
+        let currentFilename = null;
+        let currentResultUrl= null;
+
+        /* ---------- 上传 + 预览 ---------- */
+        fileInput.addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('file-info').textContent =
+                `已选择: ${file.name} (${formatFileSize(file.size)})`;
+
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const url = ev.target.result;
+                if (file.type.startsWith('image/')) {
+                    previewImg.src = url;
+                    previewImg.style.display = 'block';
+                    previewVideo.style.display = 'none';
+                    previewText.style.display = 'none';
+                } else if (file.type.startsWith('video/')) {
+                    previewVideo.src = url;
+                    previewVideo.style.display = 'block';
+                    previewImg.style.display = 'none';
+                    previewText.style.display = 'none';
+                }
+            };
+            reader.readAsDataURL(file);
+            uploadFile(file);
+        });
+
+        async function uploadFile(file) {
+            const fd = new FormData(); fd.append('file', file);
+            try {
+                showStatus('上传中...', 'success');
+                const res = await fetch('/upload', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (res.ok) { currentFilename = data.filename; showStatus('文件上传成功！', 'success'); }
+                else        { showStatus(`上传失败: ${data.error}`, 'error'); }
+            } catch (e) { showStatus(`上传错误: ${e.message}`, 'error'); }
+        }
+
+        /* ---------- 推理 ---------- */
+        inferBtn.addEventListener('click', async () => {
+            if (!currentFilename) { showStatus('请先上传文件', 'error'); return; }
+            showStatus('推理处理中...', 'success');
+            try {
+                const res = await fetch('/infer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: currentFilename,
+                        algorithm: algoSel.value,
+                        prompt: promptTa.value,
+                        additional_info: addInfoTa.value
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    currentResultUrl = data.result_url;
+                    showStatus('推理完成！', 'success');
+                    showResultMedia(currentResultUrl);
+                } else {
+                    showStatus(`推理失败: ${data.error || '服务器错误'}`, 'error');
+                }
+            } catch (e) { showStatus(`请求错误: ${e.message}`, 'error'); }
+        });
+
+        /* ---------- 结果展示：自动识别视频 ---------- */
+        function isVideo(url) {
+            if (!url) return false;
+            return /\.(mp4|webm|ogg|mov|mkv)$/i.test(url) || url.includes('video');
+        }
+        function showResultMedia(url) {
+            if (isVideo(url)) {
+                resultVideo.src = url;
+                resultVideo.style.display = 'block';
+                resultImg.style.display   = 'none';
+                resultText.style.display  = 'none';
+            } else {                       // 图片或其他
+                resultImg.src = url;
+                resultImg.style.display   = 'block';
+                resultVideo.style.display = 'none';
+                resultText.style.display  = 'none';
+            }
+        }
+
+        /* ---------- 保存 / 下载 ---------- */
+        saveBtn.addEventListener('click', async () => {
+            if (!currentResultUrl) { showStatus('没有可保存的结果', 'error'); return; }
+            try {
+                showStatus('保存中...', 'success');
+                const filename = currentResultUrl.split('/').pop();
+                const res = await fetch('/save-result', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename })
+                });
+                const data = await res.json();
+                if (res.ok) showStatus(data.message || '结果保存成功！', 'success');
+                else        showStatus(`保存失败: ${data.error || '服务器错误'}`, 'error');
+            } catch (e) { showStatus(`保存错误: ${e.message}`, 'error'); }
+        });
+
+        downBtn.addEventListener('click', () => {
+            if (!currentResultUrl) { showStatus('没有可下载的结果', 'error'); return; }
+            const a = document.createElement('a'); a.href = currentResultUrl; a.download = '';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        });
+
+        /* ---------- 清除 ---------- */
+        clearBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            previewImg.style.display   = 'none';
+            previewVideo.style.display = 'none';
+            previewText.style.display  = 'block';
+
+            resultImg.style.display   = 'none';
+            resultVideo.style.display = 'none';
+            resultText.style.display  = 'block';
+
+            currentFilename = null; currentResultUrl = null;
+            promptTa.value  = ''; addInfoTa.value = '';
+            showStatus('内容已清除', 'success');
+        });
+
+        /* ---------- 小工具 ---------- */
+        function formatFileSize(b) {
+            if (b === 0) return '0 Bytes';
+            const k = 1024, sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(b) / Math.log(k));
+            return parseFloat((b / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        function showStatus(msg, type) {
+            statusDiv.textContent = msg; statusDiv.className = `status ${type}`; statusDiv.style.display = 'block';
+            setTimeout(() => statusDiv.style.display = 'none', 5000);
+        }
+    </script>
+</body>
+</html>
