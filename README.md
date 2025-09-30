@@ -14,7 +14,7 @@
   - [ ] SAM/SAM2 集成（计划中）
 
 ## 界面预览  
-![主界面](visual_flask/Assets/mainpage.png)
+![主界面](Assets/mainpage.png)
 
 ## 快速开始```bash
 # 克隆仓库
